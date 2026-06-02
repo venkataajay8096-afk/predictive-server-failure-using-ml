@@ -1,8 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 
-set PROJECT_DIR=C:\Users\venka\Desktop\sever project
-cd /d "%PROJECT_DIR%"
+cd /d "%~dp0"
 
 echo.
 echo ========================================
@@ -19,7 +18,7 @@ REM Step 2: Initialize database and train models
 echo.
 echo [Step 2/3] Initializing database and ML models...
 echo        (This may take 30-60 seconds on first run)
-.venv\Scripts\python.exe -c "from generate_data import setup_initial_database; setup_initial_database()"
+.venv\Scripts\python.exe -c "from database.generate_data import setup_initial_database; setup_initial_database()"
 if errorlevel 1 (
     echo [WARNING] Database initialization issue detected
 )
@@ -34,6 +33,6 @@ echo  Server running at: http://localhost:5000
 echo ========================================
 echo.
 
-.venv\Scripts\python.exe app.py
+.venv\Scripts\python.exe run.py
 
 pause

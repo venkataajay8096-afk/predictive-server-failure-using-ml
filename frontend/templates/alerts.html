@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="alerts-summary-cards">
+    <!-- Total Active Alerts Card -->
+    <div class="alert-summary-card card-danger">
+        <div class="card-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+        <div class="card-info">
+            <span class="card-label">Active Threat Incidents</span>
+            <h3 id="stat-active-alerts">0</h3>
+        </div>
+    </div>
+    
+    <!-- Total Resolved Alerts Card -->
+    <div class="alert-summary-card card-success">
+        <div class="card-icon"><i class="fa-solid fa-circle-check"></i></div>
+        <div class="card-info">
+            <span class="card-label">Resolved Issues</span>
+            <h3 id="stat-resolved-alerts">0</h3>
+        </div>
+    </div>
+
+    <!-- Average Probability Card -->
+    <div class="alert-summary-card card-warning">
+        <div class="card-icon"><i class="fa-solid fa-gauge-high"></i></div>
+        <div class="card-info">
+            <span class="card-label">Avg Anomaly Threshold</span>
+            <h3>80.0%</h3>
+        </div>
+    </div>
+</div>
+
+<div class="alerts-main-layout">
+    <!-- Active Alerts Panel -->
+    <div class="dashboard-panel active-alerts-panel">
+        <div class="panel-header">
+            <h3><i class="fa-solid fa-bell text-neon-pink pulse"></i> Current Unresolved Threats</h3>
+            <span class="badge badge-critical" id="unresolved-badge">0 Active</span>
+        </div>
+        
+        <div class="active-alerts-list" id="active-alerts-container">
+            <!-- Dynamic alerts cards injected here -->
+            <p class="no-alerts-msg"><i class="fa-solid fa-shield-halved"></i> No active server failure threats detected. System is running securely.</p>
+        </div>
+    </div>
+
+    <!-- Alert Log Table Panel -->
+    <div class="dashboard-panel history-alerts-panel">
+        <div class="panel-header">
+            <h3><i class="fa-solid fa-clock-rotate-left text-neon-teal"></i> Incident History Log</h3>
+            <button class="btn-secondary" onclick="loadAllAlerts()"><i class="fa-solid fa-arrows-rotate"></i> Refresh Log</button>
+        </div>
+        
+        <div class="table-container">
+            <table class="alerts-table">
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Type of Incident</th>
+                        <th>ML Risk Prob.</th>
+                        <th>Severity</th>
+                        <th>Diagnostic Details</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="alerts-history-tbody">
+                    <!-- Historical alerts lists injected here -->
+                    <tr>
+                        <td colspan="6" class="text-center">Loading incident history...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Glassmorphic Resolve Modal -->
+<div class="modal-overlay" id="resolve-modal" style="display: none;">
+    <div class="resolve-modal-card">
+        <div class="modal-header">
+            <h3><i class="fa-solid fa-check-double text-neon-teal"></i> Log Threat Resolution</h3>
+            <button class="close-modal-btn" onclick="closeResolveModal()"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="resolve-alert-id">
+            <div class="resolve-context-box">
+                <p>Resolving incident: <strong id="resolve-alert-title" class="text-neon-pink">CPU Overheat</strong></p>
+                <p class="context-desc" id="resolve-alert-desc">Spike predicted with 94.5% certainty.</p>
+            </div>
+            
+            <div class="form-group">
+                <label for="resolution-notes">Technician Diagnostic Action Log:</label>
+                <textarea id="resolution-notes" placeholder="Describe actions taken to resolve this server anomaly (e.g., 'Rebooted secondary cooling fan unit', 'Garbage collection forced, memory usage stabilized')..." rows="4"></textarea>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" onclick="closeResolveModal()">Cancel</button>
+            <button class="btn-primary" onclick="submitResolution()">Mark as Resolved</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let activeAlerts = [];
+    
+    // Load active and historical alerts on boot
+    window.addEventListener('load', () => {
+        loadActiveAlerts();
+        loadAllAlerts();
+    });
+
+    function loadActiveAlerts() {
+        fetch('/api/alerts/active')
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    activeAlerts = data.alerts;
+                    document.getElementById('stat-active-alerts').textContent = activeAlerts.length;
+                    document.getElementById('unresolved-badge').textContent = activeAlerts.length + ' Active';
+                    
+                    const container = document.getElementById('active-alerts-container');
+                    
+                    if (activeAlerts.length === 0) {
+                        container.innerHTML = `<p class="no-alerts-msg"><i class="fa-solid fa-shield-halved"></i> No active server failure threats detected. System is running securely.</p>`;
+                        return;
+                    }
+                    
+                    container.innerHTML = activeAlerts.map(alert => {
+                        const date = new Date(alert.timestamp).toLocaleTimeString();
+                        const prob = (alert.probability * 100).toFixed(1);
+                        const isCritical = alert.severity === 'Critical';
+                        const badgeClass = isCritical ? 'badge-critical' : 'badge-warning';
+                        const borderClass = isCritical ? 'border-neon-pink' : 'border-neon-yellow';
+                        
+                        return `
+                            <div class="active-alert-item ${borderClass}">
+                                <div class="alert-icon-section ${isCritical ? 'text-neon-pink' : 'text-neon-yellow'}">
+                                    <i class="fa-solid fa-triangle-exclamation pulse"></i>
+                                </div>
+                                <div class="alert-details-section">
+                                    <div class="alert-item-header">
+                                        <h4>${alert.failure_type} Anomaly</h4>
+                                        <span class="badge ${badgeClass}">${alert.severity}</span>
+                                    </div>
+                                    <p class="alert-msg-text">${alert.message}</p>
+                                    <div class="alert-meta-text">
+                                        <span><i class="fa-regular fa-clock"></i> Detected: ${date}</span>
+                                        <span><i class="fa-solid fa-brain"></i> Probability: ${prob}%</span>
+                                    </div>
+                                </div>
+                                <div class="alert-action-section">
+                                    <button class="btn-resolve" onclick="openResolveModal(${alert.id}, '${alert.failure_type}', '${alert.message.replace(/'/g, "\\'")}')">
+                                        <i class="fa-solid fa-check"></i> Resolve
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+            })
+            .catch(err => console.error("Error loading active alerts:", err));
+    }
+
+    function loadAllAlerts() {
+        fetch('/api/alerts/all')
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    const tbody = document.getElementById('alerts-history-tbody');
+                    const alerts = data.alerts;
+                    
+                    // Filter out active alerts to count resolved
+                    const resolvedCount = alerts.filter(a => a.resolved).length;
+                    document.getElementById('stat-resolved-alerts').textContent = resolvedCount;
+                    
+                    if (alerts.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="6" class="text-center">No alert log history available.</td></tr>`;
+                        return;
+                    }
+                    
+                    tbody.innerHTML = alerts.map(alert => {
+                        const date = new Date(alert.timestamp).toLocaleString();
+                        const prob = (alert.probability * 100).toFixed(1);
+                        const isCritical = alert.severity === 'Critical';
+                        const badgeClass = isCritical ? 'badge-critical' : 'badge-warning';
+                        
+                        // Corporate semantic row highlight classes
+                        const rowClass = alert.resolved ? 'resolved-alert-row' : 'active-alert-row';
+
+                        let statusHtml = '';
+                        if (alert.resolved) {
+                            statusHtml = `
+                                <div class="status-cell-resolved">
+                                    <span style="color:#0d9488;font-weight:600;"><i class="fa-solid fa-circle-check"></i> Resolved</span>
+                                    <small class="res-notes" title="${alert.resolution_notes}">Notes: ${alert.resolution_notes || 'Fixed'}</small>
+                                </div>
+                            `;
+                        } else {
+                            statusHtml = `<span class="badge badge-critical pulse-neon">ACTIVE</span>`;
+                        }
+                        
+                        return `
+                            <tr class="${rowClass}">
+                                <td>${date}</td>
+                                <td><strong>${alert.failure_type}</strong></td>
+                                <td><span style="font-weight:600;">${prob}%</span></td>
+                                <td><span class="badge ${badgeClass}">${alert.severity}</span></td>
+                                <td><div class="desc-cell" title="${alert.message}">${alert.message}</div></td>
+                                <td>${statusHtml}</td>
+                            </tr>
+                        `;
+                    }).join('');
+                }
+            })
+            .catch(err => console.error("Error loading alert history:", err));
+    }
+
+    function openResolveModal(id, type, message) {
+        document.getElementById('resolve-alert-id').value = id;
+        document.getElementById('resolve-alert-title').textContent = type + ' Anomaly Detected';
+        document.getElementById('resolve-alert-desc').textContent = message;
+        document.getElementById('resolution-notes').value = '';
+        document.getElementById('resolve-modal').style.display = 'flex';
+    }
+
+    function closeResolveModal() {
+        document.getElementById('resolve-modal').style.display = 'none';
+    }
+
+    function submitResolution() {
+        const id = document.getElementById('resolve-alert-id').value;
+        const notes = document.getElementById('resolution-notes').value || 'System stabilized. Standard operation restored.';
+        
+        fetch('/api/alerts/resolve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ alert_id: id, notes: notes })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                closeResolveModal();
+                loadActiveAlerts();
+                loadAllAlerts();
+                // Check if global navigation checks need updating
+                if (typeof checkGlobalAlerts === 'function') checkGlobalAlerts();
+            } else {
+                alert("Error resolving alert: " + data.error);
+            }
+        })
+        .catch(err => console.error("Error resolving alert:", err));
+    }
+</script>
+{% endblock %}

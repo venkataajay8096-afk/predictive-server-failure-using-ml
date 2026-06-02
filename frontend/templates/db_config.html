@@ -1,0 +1,576 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="db-config-page">
+
+    <!-- Status Banner -->
+    <div class="db-status-banner" id="db-status-banner">
+        <div class="db-status-icon" id="db-status-icon">
+            <i class="fa-solid fa-circle-notch fa-spin"></i>
+        </div>
+        <div class="db-status-info">
+            <h3 id="db-status-title">Checking database connection…</h3>
+            <p id="db-status-detail">Please wait while we verify the current connection.</p>
+        </div>
+        <div class="db-badge" id="db-engine-badge">—</div>
+    </div>
+
+    <!-- Two-column layout -->
+    <div class="db-grid">
+
+        <!-- LEFT: Connection Form -->
+        <div class="glass-card db-form-card">
+            <div class="card-header">
+                <i class="fa-solid fa-plug-circle-bolt text-neon-cyan"></i>
+                <div>
+                    <h3>MySQL Connection Settings</h3>
+                    <p>Enter your MySQL server credentials. Leave blank to use the local SQLite fallback.</p>
+                </div>
+            </div>
+
+            <form id="db-connect-form" autocomplete="off">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="db-host"><i class="fa-solid fa-server"></i> Host</label>
+                        <input type="text" id="db-host" name="host" placeholder="localhost" value="localhost">
+                    </div>
+                    <div class="form-group form-group-sm">
+                        <label for="db-port"><i class="fa-solid fa-hashtag"></i> Port</label>
+                        <input type="number" id="db-port" name="port" placeholder="3306" value="3306">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="db-user"><i class="fa-solid fa-user"></i> Username</label>
+                        <input type="text" id="db-user" name="user" placeholder="root">
+                    </div>
+                    <div class="form-group">
+                        <label for="db-password"><i class="fa-solid fa-lock"></i> Password</label>
+                        <div class="password-input-wrap">
+                            <input type="password" id="db-password" name="password" placeholder="••••••••">
+                            <button type="button" class="password-toggle" onclick="togglePassword()" title="Show/Hide">
+                                <i class="fa-solid fa-eye" id="pw-eye-icon"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="db-name"><i class="fa-solid fa-database"></i> Database Name</label>
+                    <input type="text" id="db-name" name="db_name" placeholder="sentryml_db">
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" id="test-btn" class="btn btn-outline" onclick="testConnection()">
+                        <i class="fa-solid fa-vial"></i> Test Connection
+                    </button>
+                    <button type="submit" id="connect-btn" class="btn btn-primary" onclick="saveAndConnect(event)">
+                        <i class="fa-solid fa-plug"></i> Save &amp; Connect
+                    </button>
+                </div>
+            </form>
+
+            <!-- Test Result -->
+            <div id="test-result-box" class="test-result-box" style="display:none;"></div>
+
+            <!-- SQLite Fallback -->
+            <div class="sqlite-fallback-section">
+                <div class="section-divider"><span>OR</span></div>
+                <div class="sqlite-info-box">
+                    <i class="fa-solid fa-database" style="color: var(--accent-cyan);"></i>
+                    <div>
+                        <strong>Use Local SQLite (Default)</strong>
+                        <p>The app automatically uses <code>project.db</code> when no MySQL credentials are configured. No setup needed.</p>
+                    </div>
+                    <button class="btn btn-sm btn-outline" onclick="useSQLite()">
+                        <i class="fa-solid fa-arrow-rotate-left"></i> Reset to SQLite
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT: Info Cards -->
+        <div class="db-info-column">
+
+            <!-- Current Connection Card -->
+            <div class="glass-card db-info-card">
+                <div class="card-header-sm">
+                    <i class="fa-solid fa-circle-info text-neon-cyan"></i>
+                    <h4>Current Connection</h4>
+                </div>
+                <div class="conn-details" id="conn-details">
+                    <div class="conn-row">
+                        <span class="conn-label">Engine</span>
+                        <span class="conn-value" id="info-engine">Checking…</span>
+                    </div>
+                    <div class="conn-row">
+                        <span class="conn-label">Host</span>
+                        <span class="conn-value" id="info-host">—</span>
+                    </div>
+                    <div class="conn-row">
+                        <span class="conn-label">Database</span>
+                        <span class="conn-value" id="info-db">—</span>
+                    </div>
+                    <div class="conn-row">
+                        <span class="conn-label">Status</span>
+                        <span class="conn-value" id="info-status">—</span>
+                    </div>
+                    <div class="conn-row">
+                        <span class="conn-label">Tables</span>
+                        <span class="conn-value" id="info-tables">—</span>
+                    </div>
+                    <div class="conn-row">
+                        <span class="conn-label">Records</span>
+                        <span class="conn-value" id="info-records">—</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Setup Guide Card -->
+            <div class="glass-card db-info-card">
+                <div class="card-header-sm">
+                    <i class="fa-solid fa-book-open text-neon-cyan"></i>
+                    <h4>Quick Setup Guide</h4>
+                </div>
+                <ol class="setup-steps">
+                    <li>
+                        <span class="step-num">1</span>
+                        <div>
+                            <strong>Start MySQL Server</strong>
+                            <p>Make sure MySQL is running on your machine (e.g., via XAMPP, MySQL Workbench, or as a Windows service).</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="step-num">2</span>
+                        <div>
+                            <strong>Fill in Credentials</strong>
+                            <p>Enter your MySQL host, port, username, password, and target database name on the left.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="step-num">3</span>
+                        <div>
+                            <strong>Test the Connection</strong>
+                            <p>Click <em>Test Connection</em> to verify SentryML can reach the MySQL server.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="step-num">4</span>
+                        <div>
+                            <strong>Save &amp; Initialize</strong>
+                            <p>Click <em>Save &amp; Connect</em>. The app will create the database, tables, and seed the ML models automatically.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="step-num">5</span>
+                        <div>
+                            <strong>Restart the Server</strong>
+                            <p>After saving, restart <code>app.py</code> for the new database to take full effect.</p>
+                        </div>
+                    </li>
+                </ol>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="glass-card db-info-card">
+                <div class="card-header-sm">
+                    <i class="fa-solid fa-bolt text-neon-cyan"></i>
+                    <h4>Database Actions</h4>
+                </div>
+                <div class="db-actions-grid">
+                    <button class="db-action-btn" onclick="runSeedData()">
+                        <i class="fa-solid fa-seedling"></i>
+                        <span>Re-seed Data</span>
+                        <small>Regenerate ML training data &amp; historical records</small>
+                    </button>
+                    <button class="db-action-btn" onclick="checkStatus()">
+                        <i class="fa-solid fa-stethoscope"></i>
+                        <span>Health Check</span>
+                        <small>Verify all tables and counts</small>
+                    </button>
+                </div>
+                <div id="action-result" class="action-result-box" style="display:none;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+/* ======================== DB CONFIG PAGE STYLES ======================== */
+.db-config-page { padding: 0 4px; }
+
+.db-status-banner {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 24px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, rgba(0,200,255,0.08), rgba(0,255,160,0.05));
+    border: 1px solid rgba(0,200,255,0.2);
+    margin-bottom: 24px;
+    transition: all 0.4s ease;
+}
+.db-status-banner.status-ok { background: linear-gradient(135deg, rgba(0,255,160,0.1), rgba(0,200,255,0.06)); border-color: rgba(0,255,160,0.3); }
+.db-status-banner.status-error { background: linear-gradient(135deg, rgba(255,50,80,0.1), rgba(255,100,50,0.06)); border-color: rgba(255,50,80,0.3); }
+.db-status-banner.status-sqlite { background: linear-gradient(135deg, rgba(0,200,255,0.08), rgba(120,80,255,0.05)); border-color: rgba(0,200,255,0.2); }
+
+.db-status-icon { font-size: 28px; width: 44px; text-align: center; }
+.db-status-icon .ok { color: #00ffa0; }
+.db-status-icon .err { color: #ff3250; }
+.db-status-icon .sqlite-ic { color: #00c8ff; }
+
+.db-status-info { flex: 1; }
+.db-status-info h3 { font-size: 16px; font-weight: 600; color: var(--text-primary); margin: 0 0 4px; }
+.db-status-info p { font-size: 13px; color: var(--text-secondary); margin: 0; }
+
+.db-badge {
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    background: rgba(0,200,255,0.15);
+    border: 1px solid rgba(0,200,255,0.3);
+    color: #00c8ff;
+}
+.db-badge.mysql { background: rgba(255,165,0,0.12); border-color: rgba(255,165,0,0.3); color: #ffa500; }
+.db-badge.sqlite { background: rgba(120,80,255,0.12); border-color: rgba(120,80,255,0.3); color: #a06fff; }
+.db-badge.error { background: rgba(255,50,80,0.12); border-color: rgba(255,50,80,0.3); color: #ff3250; }
+
+.db-grid { display: grid; grid-template-columns: 1fr 380px; gap: 22px; align-items: start; }
+
+/* Form Card */
+.db-form-card .card-header {
+    display: flex; align-items: flex-start; gap: 14px;
+    padding-bottom: 18px; border-bottom: 1px solid rgba(255,255,255,0.07);
+    margin-bottom: 22px;
+}
+.db-form-card .card-header i { font-size: 22px; margin-top: 3px; }
+.db-form-card .card-header h3 { font-size: 16px; font-weight: 600; margin: 0 0 4px; }
+.db-form-card .card-header p { font-size: 13px; color: var(--text-secondary); margin: 0; }
+
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.form-group { margin-bottom: 16px; }
+.form-group-sm { max-width: 120px; }
+.form-group label { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 7px; }
+.form-group label i { font-size: 11px; color: #00c8ff; }
+.form-group input {
+    width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px; padding: 11px 14px; font-size: 14px; color: var(--text-primary);
+    font-family: 'Inter', sans-serif; transition: all 0.25s ease; box-sizing: border-box;
+}
+.form-group input:focus { outline: none; border-color: rgba(0,200,255,0.5); background: rgba(0,200,255,0.06); box-shadow: 0 0 0 3px rgba(0,200,255,0.1); }
+.form-group input::placeholder { color: rgba(255,255,255,0.25); }
+
+.password-input-wrap { position: relative; }
+.password-input-wrap input { padding-right: 44px; }
+.password-toggle {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; color: rgba(255,255,255,0.35); cursor: pointer;
+    padding: 4px; transition: color 0.2s;
+}
+.password-toggle:hover { color: #00c8ff; }
+
+.form-actions { display: flex; gap: 12px; margin-top: 6px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 11px 22px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; transition: all 0.25s ease; font-family: 'Inter', sans-serif; }
+.btn-primary { background: linear-gradient(135deg, #00c8ff, #0080ff); color: #fff; box-shadow: 0 4px 18px rgba(0,200,255,0.3); }
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(0,200,255,0.45); }
+.btn-outline { background: rgba(255,255,255,0.07); color: var(--text-primary); border: 1px solid rgba(255,255,255,0.15); }
+.btn-outline:hover { background: rgba(255,255,255,0.12); border-color: rgba(0,200,255,0.4); color: #00c8ff; }
+.btn-sm { font-size: 12px; padding: 7px 14px; }
+
+.test-result-box { margin-top: 16px; padding: 12px 16px; border-radius: 10px; font-size: 13px; font-weight: 500; }
+.test-result-box.ok { background: rgba(0,255,160,0.1); border: 1px solid rgba(0,255,160,0.3); color: #00ffa0; }
+.test-result-box.err { background: rgba(255,50,80,0.1); border: 1px solid rgba(255,50,80,0.3); color: #ff3250; }
+
+.sqlite-fallback-section { margin-top: 24px; }
+.section-divider { text-align: center; position: relative; margin: 18px 0; }
+.section-divider::before { content: ''; position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: rgba(255,255,255,0.08); }
+.section-divider span { position: relative; background: var(--card-bg); padding: 0 12px; font-size: 11px; color: rgba(255,255,255,0.3); font-weight: 600; letter-spacing: 1px; }
+.sqlite-info-box { display: flex; align-items: flex-start; gap: 14px; padding: 16px; border-radius: 12px; background: rgba(120,80,255,0.07); border: 1px solid rgba(120,80,255,0.2); }
+.sqlite-info-box i { font-size: 20px; margin-top: 2px; flex-shrink: 0; }
+.sqlite-info-box strong { font-size: 14px; display: block; margin-bottom: 4px; }
+.sqlite-info-box p { font-size: 12px; color: var(--text-secondary); margin: 0; }
+.sqlite-info-box code { background: rgba(255,255,255,0.1); padding: 1px 5px; border-radius: 4px; font-size: 11px; }
+.sqlite-info-box .btn { flex-shrink: 0; align-self: center; }
+
+/* Info Column */
+.db-info-column { display: flex; flex-direction: column; gap: 16px; }
+.db-info-card { padding: 20px; }
+.card-header-sm { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.07); }
+.card-header-sm i { font-size: 16px; }
+.card-header-sm h4 { font-size: 14px; font-weight: 600; margin: 0; }
+
+.conn-details { display: flex; flex-direction: column; gap: 8px; }
+.conn-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+.conn-row:last-child { border-bottom: none; }
+.conn-label { font-size: 12px; color: var(--text-secondary); font-weight: 500; }
+.conn-value { font-size: 13px; font-weight: 600; color: var(--text-primary); font-family: 'JetBrains Mono', monospace; }
+
+.setup-steps { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 14px; }
+.setup-steps li { display: flex; gap: 12px; align-items: flex-start; }
+.step-num { width: 24px; height: 24px; border-radius: 50%; background: linear-gradient(135deg, #00c8ff, #0080ff); color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+.setup-steps strong { font-size: 13px; display: block; margin-bottom: 3px; }
+.setup-steps p { font-size: 12px; color: var(--text-secondary); margin: 0; }
+.setup-steps em { color: #00c8ff; font-style: normal; }
+.setup-steps code { background: rgba(255,255,255,0.08); padding: 1px 5px; border-radius: 4px; font-size: 11px; }
+
+.db-actions-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.db-action-btn {
+    display: flex; flex-direction: column; align-items: center; text-align: center;
+    gap: 6px; padding: 14px 10px; border-radius: 12px; cursor: pointer;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);
+    color: var(--text-primary); transition: all 0.25s ease;
+    font-family: 'Inter', sans-serif;
+}
+.db-action-btn:hover { background: rgba(0,200,255,0.08); border-color: rgba(0,200,255,0.3); transform: translateY(-2px); }
+.db-action-btn i { font-size: 20px; color: #00c8ff; margin-bottom: 2px; }
+.db-action-btn span { font-size: 13px; font-weight: 600; }
+.db-action-btn small { font-size: 11px; color: var(--text-secondary); line-height: 1.3; }
+
+.action-result-box { margin-top: 12px; padding: 10px 14px; border-radius: 10px; font-size: 13px; }
+.action-result-box.ok { background: rgba(0,255,160,0.1); border: 1px solid rgba(0,255,160,0.25); color: #00ffa0; }
+.action-result-box.err { background: rgba(255,50,80,0.1); border: 1px solid rgba(255,50,80,0.25); color: #ff3250; }
+.action-result-box.info { background: rgba(0,200,255,0.08); border: 1px solid rgba(0,200,255,0.2); color: #00c8ff; }
+
+@media (max-width: 1100px) {
+    .db-grid { grid-template-columns: 1fr; }
+    .db-info-column { display: grid; grid-template-columns: 1fr 1fr; }
+}
+</style>
+
+<script>
+// ========================= DB CONFIG PAGE JS =========================
+
+function setStatusBanner(state, title, detail, engine) {
+    const banner = document.getElementById('db-status-banner');
+    const icon   = document.getElementById('db-status-icon');
+    const ttl    = document.getElementById('db-status-title');
+    const det    = document.getElementById('db-status-detail');
+    const badge  = document.getElementById('db-engine-badge');
+
+    banner.className = 'db-status-banner';
+    if (state === 'ok') {
+        banner.classList.add('status-ok');
+        icon.innerHTML = '<i class="fa-solid fa-circle-check ok"></i>';
+        badge.textContent = engine || 'Connected';
+        badge.className = 'db-badge ' + (engine === 'MySQL' ? 'mysql' : 'sqlite');
+    } else if (state === 'error') {
+        banner.classList.add('status-error');
+        icon.innerHTML = '<i class="fa-solid fa-circle-xmark err"></i>';
+        badge.textContent = 'Error';
+        badge.className = 'db-badge error';
+    } else {
+        icon.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin" style="color:#00c8ff"></i>';
+        badge.textContent = '—';
+        badge.className = 'db-badge';
+    }
+    ttl.textContent = title;
+    det.textContent = detail;
+}
+
+function updateInfoPanel(data) {
+    document.getElementById('info-engine').textContent  = data.engine  || '—';
+    document.getElementById('info-host').textContent    = data.host    || '—';
+    document.getElementById('info-db').textContent      = data.db_name || '—';
+    document.getElementById('info-tables').textContent  = data.tables  !== undefined ? data.tables  : '—';
+    document.getElementById('info-records').textContent = data.records !== undefined ? data.records : '—';
+    
+    const statusEl = document.getElementById('info-status');
+    if (data.connected) {
+        statusEl.innerHTML = '<span style="color:#00ffa0;"><i class="fa-solid fa-circle" style="font-size:9px;"></i> Connected</span>';
+    } else {
+        statusEl.innerHTML = '<span style="color:#ff3250;"><i class="fa-solid fa-circle" style="font-size:9px;"></i> Disconnected</span>';
+    }
+}
+
+function checkStatus() {
+    setStatusBanner('loading', 'Checking database connection…', 'Please wait…');
+    
+    fetch('/api/db/status')
+        .then(r => r.json())
+        .then(data => {
+            if (data.connected) {
+                setStatusBanner('ok', 
+                    `Connected to ${data.engine} database`, 
+                    data.uri_hint || '',
+                    data.engine
+                );
+            } else {
+                setStatusBanner('error', 
+                    'Database connection failed', 
+                    data.error || 'Could not reach the database.'
+                );
+            }
+            updateInfoPanel(data);
+            
+            // Pre-fill form from current env if MySQL
+            if (data.engine === 'MySQL' && data.host) {
+                document.getElementById('db-host').value = data.host;
+                document.getElementById('db-port').value = data.port || 3306;
+                document.getElementById('db-user').value = data.user || '';
+                document.getElementById('db-name').value = data.db_name || '';
+            }
+        })
+        .catch(e => {
+            setStatusBanner('error', 'Cannot reach server API', e.message);
+        });
+}
+
+function testConnection() {
+    const host     = document.getElementById('db-host').value.trim();
+    const port     = document.getElementById('db-port').value.trim();
+    const user     = document.getElementById('db-user').value.trim();
+    const password = document.getElementById('db-password').value;
+    const db_name  = document.getElementById('db-name').value.trim();
+
+    if (!user || !db_name) {
+        showTestResult('err', '<i class="fa-solid fa-xmark"></i> Username and Database Name are required to test a MySQL connection.');
+        return;
+    }
+
+    const btn = document.getElementById('test-btn');
+    btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Testing…';
+    btn.disabled = true;
+
+    fetch('/api/db/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ host, port, user, password, db_name })
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.innerHTML = '<i class="fa-solid fa-vial"></i> Test Connection';
+        btn.disabled = false;
+        if (data.success) {
+            showTestResult('ok', `<i class="fa-solid fa-circle-check"></i> ${data.message}`);
+        } else {
+            showTestResult('err', `<i class="fa-solid fa-circle-xmark"></i> ${data.error}`);
+        }
+    })
+    .catch(e => {
+        btn.innerHTML = '<i class="fa-solid fa-vial"></i> Test Connection';
+        btn.disabled = false;
+        showTestResult('err', `<i class="fa-solid fa-circle-xmark"></i> Server error: ${e.message}`);
+    });
+}
+
+function showTestResult(type, html) {
+    const box = document.getElementById('test-result-box');
+    box.innerHTML = html;
+    box.className = 'test-result-box ' + type;
+    box.style.display = 'block';
+}
+
+function saveAndConnect(e) {
+    e.preventDefault();
+    const host     = document.getElementById('db-host').value.trim();
+    const port     = document.getElementById('db-port').value.trim();
+    const user     = document.getElementById('db-user').value.trim();
+    const password = document.getElementById('db-password').value;
+    const db_name  = document.getElementById('db-name').value.trim();
+
+    if (!user || !db_name) {
+        showTestResult('err', '<i class="fa-solid fa-xmark"></i> Please fill in Username and Database Name.');
+        return;
+    }
+
+    const btn = document.getElementById('connect-btn');
+    btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Saving…';
+    btn.disabled = true;
+
+    fetch('/api/db/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ host, port, user, password, db_name })
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.innerHTML = '<i class="fa-solid fa-plug"></i> Save & Connect';
+        btn.disabled = false;
+        if (data.success) {
+            showTestResult('ok', `<i class="fa-solid fa-circle-check"></i> ${data.message}`);
+            setTimeout(checkStatus, 800);
+        } else {
+            showTestResult('err', `<i class="fa-solid fa-circle-xmark"></i> ${data.error}`);
+        }
+    })
+    .catch(e => {
+        btn.innerHTML = '<i class="fa-solid fa-plug"></i> Save & Connect';
+        btn.disabled = false;
+        showTestResult('err', `<i class="fa-solid fa-circle-xmark"></i> Server error: ${e.message}`);
+    });
+}
+
+function useSQLite() {
+    if (!confirm('This will clear the MySQL configuration and revert to the local SQLite database. Continue?')) return;
+
+    fetch('/api/db/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ use_sqlite: true })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            showTestResult('ok', '<i class="fa-solid fa-circle-check"></i> Reverted to SQLite. Restart the app to apply.');
+            document.getElementById('db-user').value = '';
+            document.getElementById('db-password').value = '';
+            document.getElementById('db-name').value = '';
+            setTimeout(checkStatus, 800);
+        } else {
+            showTestResult('err', '<i class="fa-solid fa-circle-xmark"></i> ' + data.error);
+        }
+    });
+}
+
+function runSeedData() {
+    const btn = event.currentTarget;
+    btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i><span>Running…</span><small>This may take 30-60 seconds</small>';
+    btn.disabled = true;
+    showActionResult('info', '<i class="fa-solid fa-circle-notch fa-spin"></i> Generating training data and retraining models…');
+
+    fetch('/api/db/seed', { method: 'POST' })
+    .then(r => r.json())
+    .then(data => {
+        btn.innerHTML = '<i class="fa-solid fa-seedling"></i><span>Re-seed Data</span><small>Regenerate ML training data & historical records</small>';
+        btn.disabled = false;
+        if (data.success) {
+            showActionResult('ok', `<i class="fa-solid fa-check"></i> ${data.message}`);
+            setTimeout(checkStatus, 1000);
+        } else {
+            showActionResult('err', `<i class="fa-solid fa-xmark"></i> ${data.error}`);
+        }
+    })
+    .catch(e => {
+        btn.innerHTML = '<i class="fa-solid fa-seedling"></i><span>Re-seed Data</span><small>Regenerate ML training data & historical records</small>';
+        btn.disabled = false;
+        showActionResult('err', `Server error: ${e.message}`);
+    });
+}
+
+function showActionResult(type, html) {
+    const box = document.getElementById('action-result');
+    box.innerHTML = html;
+    box.className = 'action-result-box ' + type;
+    box.style.display = 'block';
+}
+
+function togglePassword() {
+    const input = document.getElementById('db-password');
+    const icon  = document.getElementById('pw-eye-icon');
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.className = 'fa-solid fa-eye-slash';
+    } else {
+        input.type = 'password';
+        icon.className = 'fa-solid fa-eye';
+    }
+}
+
+// Auto-load status on page open
+window.addEventListener('load', checkStatus);
+</script>
+{% endblock %}

@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Live Stats Row -->
+<div class="metrics-grid">
+    <div class="metric-card cpu-card" id="card-cpu">
+        <div class="card-icon"><i class="fa-solid fa-satellite-dish"></i></div>
+        <div class="card-content">
+            <span class="card-label">CPU Usage</span>
+            <h3 class="card-value" id="val-cpu">33.4%</h3>
+            <div class="progress-bar-container"><div class="progress-bar" id="bar-cpu" style="width: 33.4%; background: var(--neon-blue);"></div></div>
+            <span class="card-footer-text">Current CPU processing load</span>
+        </div>
+    </div>
+
+    <div class="metric-card mem-card" id="card-mem">
+        <div class="card-icon"><i class="fa-solid fa-atom"></i></div>
+        <div class="card-content">
+            <span class="card-label">Memory Usage</span>
+            <h3 class="card-value" id="val-mem">43.6%</h3>
+            <div class="progress-bar-container"><div class="progress-bar" id="bar-mem" style="width: 43.6%; background: var(--neon-purple);"></div></div>
+            <span class="card-footer-text">Current RAM allocation</span>
+        </div>
+    </div>
+
+    <div class="metric-card temp-card" id="card-temp">
+        <div class="card-icon"><i class="fa-solid fa-fire-flame-curved"></i></div>
+        <div class="card-content">
+            <span class="card-label">Temperature</span>
+            <h3 class="card-value" id="val-temp">44.1°C</h3>
+            <div class="progress-bar-container"><div class="progress-bar" id="bar-temp" style="width: 44.1%; background: var(--neon-pink);"></div></div>
+            <span class="card-footer-text">Core CPU temperature</span>
+        </div>
+    </div>
+
+    <div class="metric-card disk-card" id="card-disk">
+        <div class="card-icon"><i class="fa-solid fa-shield-halved"></i></div>
+        <div class="card-content">
+            <span class="card-label">Disk Health</span>
+            <h3 class="card-value" id="val-disk">97.3%</h3>
+            <div class="progress-bar-container"><div class="progress-bar" id="bar-disk" style="width: 97.3%; background: var(--neon-teal);"></div></div>
+            <span class="card-footer-text">Disk read/write status</span>
+        </div>
+    </div>
+
+    <div class="metric-card net-card" id="card-net">
+        <div class="card-icon"><i class="fa-solid fa-wifi"></i></div>
+        <div class="card-content">
+            <span class="card-label">Network Traffic</span>
+            <h3 class="card-value" id="val-net">48.3 Mbps</h3>
+            <div class="progress-bar-container"><div class="progress-bar" id="bar-net" style="width: 48.3%; background: var(--neon-yellow);"></div></div>
+            <span class="card-footer-text">Current network throughput</span>
+        </div>
+    </div>
+</div>
+
+<!-- Emergency Action Button -->
+<div id="emergency-action" style="display: none; text-align: center; margin: 20px 0;">
+    <button class="btn-primary" id="activate-antigravity-btn" onclick="activateAntiGravity()">
+        <i class="fa-solid fa-shield-virus"></i> Activate Server Isolation
+    </button>
+</div>
+
+<!-- AI Prediction & Chart Layout -->
+<div class="dashboard-mid-row">
+    <!-- Big AI Gauge -->
+    <div class="dashboard-panel ai-panel card-glow-normal" id="ai-prediction-panel">
+        <div class="panel-header">
+            <h3><i class="fa-solid fa-shield-halved text-neon-blue"></i> Risk Diagnostics</h3>
+            <span class="model-badge" id="ai-active-model-name">Random Forest</span>
+        </div>
+        
+        <div class="ai-gauge-container">
+            <svg class="gauge-svg" viewBox="0 0 200 200">
+                <circle class="gauge-bg" cx="100" cy="100" r="85"></circle>
+                <circle class="gauge-fill" id="gauge-fill-ring" cx="100" cy="100" r="85" stroke-dasharray="534" stroke-dashoffset="534"></circle>
+            </svg>
+            <div class="gauge-center-content">
+                <span class="gauge-label">FAILURE RISK</span>
+                <span class="gauge-percentage" id="risk-percentage">0%</span>
+                <span class="gauge-status-text text-neon-cyan" id="risk-status">Healthy</span>
+            </div>
+        </div>
+
+        <div class="ai-details">
+            <div class="ai-stat-row">
+                <span>Threat Classification:</span>
+                <strong id="ai-threat-class" class="text-neon-cyan">Normal</strong>
+            </div>
+            <div class="ai-stat-row">
+                <span>Confidence Rating:</span>
+                <strong id="ai-confidence">99.8%</strong>
+            </div>
+            <div class="ai-stat-row">
+                <span>Prediction Delay:</span>
+                <strong>&lt; 3.5ms</strong>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Chart Panel -->
+    <div class="dashboard-panel chart-panel">
+        <div class="panel-header">
+            <h3><i class="fa-solid fa-chart-area text-neon-purple"></i> Telemetry Streams (Last 40 Metrics)</h3>
+            <div class="chart-controls">
+                <span class="live-indicator"><span class="dot"></span> Live updates</span>
+            </div>
+        </div>
+        <div class="chart-container">
+            <canvas id="liveTimelineChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<div class="dashboard-bottom-row">
+    <!-- Fault Injection Console -->
+    <div class="dashboard-panel fault-panel">
+        <div class="panel-header">
+            <h3><i class="fa-solid fa-vial-virus text-neon-pink"></i> Infrastructure Fault Simulation Console</h3>
+            <span class="panel-action-sub">Simulate server operational faults in real-time</span>
+        </div>
+        
+        <div class="fault-buttons-grid">
+            <button class="btn-fault btn-fault-normal active" id="btn-fault-Normal" onclick="injectFault('Normal')">
+                <i class="fa-solid fa-circle-check"></i>
+                <div class="fault-btn-txt">
+                    <h4>Normal Operations</h4>
+                    <p>Standard baseline workloads</p>
+                </div>
+            </button>
+            
+            <button class="btn-fault btn-fault-danger" id="btn-fault-CPU-Overheat" onclick="injectFault('CPU Overheat')">
+                <i class="fa-solid fa-fire"></i>
+                <div class="fault-btn-txt">
+                    <h4>CPU Thermal Overheat</h4>
+                    <p>Simulate cooling failure / heavy loops</p>
+                </div>
+            </button>
+            
+            <button class="btn-fault btn-fault-danger" id="btn-fault-Memory-Leak" onclick="injectFault('Memory Leak')">
+                <i class="fa-solid fa-bucket"></i>
+                <div class="fault-btn-txt">
+                    <h4>RAM Memory Leak</h4>
+                    <p>Gradually deplete free page tables</p>
+                </div>
+            </button>
+            
+            <button class="btn-fault btn-fault-danger" id="btn-fault-Disk-Failure" onclick="injectFault('Disk Failure')">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <div class="fault-btn-txt">
+                    <h4>Disk SMART Degradation</h4>
+                    <p>Simulate sector corruption/IO loss</p>
+                </div>
+            </button>
+            
+            <button class="btn-fault btn-fault-warning" id="btn-fault-Network-Saturation" onclick="injectFault('Network Saturation')">
+                <i class="fa-solid fa-shield-virus"></i>
+                <div class="fault-btn-txt">
+                    <h4>Network Traffic DDoS</h4>
+                    <p>Simulate traffic spike & packet floods</p>
+                </div>
+            </button>
+        </div>
+    </div>
+
+    <!-- Status Radar / Diagnostic Panel -->
+    <div class="dashboard-panel radar-panel">
+        <div class="panel-header">
+            <h3><i class="fa-solid fa-compass text-neon-teal"></i> Stress Diagnostics</h3>
+            <span class="panel-action-sub">Resource stress analysis</span>
+        </div>
+        <div class="radar-chart-container">
+            <canvas id="diagnosticsRadarChart"></canvas>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}

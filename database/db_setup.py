@@ -3,8 +3,8 @@ import sys
 import pymysql
 from dotenv import load_dotenv
 
-# Load project path
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+# Project root is one level up from this file's directory
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, BASE_DIR)
 load_dotenv(os.path.join(BASE_DIR, '.env'))
 
@@ -48,7 +48,7 @@ def create_mysql_database():
 
 def seed_database():
     """Run generate_data.py to create tables, train models, seed records."""
-    from generate_data import setup_initial_database
+    from database.generate_data import setup_initial_database
     setup_initial_database()
 
 
@@ -65,4 +65,4 @@ if __name__ == '__main__':
     seed_database()
 
     print("\n[DONE] MySQL database is fully initialised.")
-    print("       You can now (re)start app.py to use MySQL.")
+    print("       You can now (re)start run.py to use MySQL.")

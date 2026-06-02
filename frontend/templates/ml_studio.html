@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="ml-studio-grid">
+    <!-- Left Column: Models Selector & Retraining Panel -->
+    <div class="ml-left-column">
+        <!-- Retrain Models Control Card -->
+        <div class="dashboard-panel retrain-panel">
+            <div class="panel-header">
+                <h3><i class="fa-solid fa-gears text-neon-blue"></i> ML Pipeline Retraining</h3>
+            </div>
+            <div class="retrain-form-body">
+                <p class="panel-desc">
+                    Re-generate a custom synthetic training dataset with random workloads and injected faults to retrain and compare all four models instantly.
+                </p>
+                <div class="input-group">
+                    <label for="dataset-size">Training Dataset Size (samples):</label>
+                    <div class="input-with-btn">
+                        <input type="number" id="dataset-size" value="2000" min="500" max="10000" step="500">
+                        <button class="btn-primary" id="btn-retrain" onclick="triggerRetrain()">
+                            <i class="fa-solid fa-rotate"></i> Retrain Models
+                        </button>
+                    </div>
+                    <small>Standard: 2,000 samples. Higher values improve accuracy but take longer to train.</small>
+                </div>
+                
+                <!-- Training Progress Loader -->
+                <div class="training-loader" id="training-progress" style="display: none;">
+                    <div class="spinner"></div>
+                    <div class="loader-text">
+                        <h4>Pipeline Execution in Progress...</h4>
+                        <p id="training-status-step">Re-generating synthetic log distributions...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Four Models Overview List -->
+        <div class="ml-models-container" id="ml-models-list">
+            <!-- Dynamic content loaded via JS -->
+            <div class="model-loading-placeholder">
+                <i class="fa-solid fa-circle-notch fa-spin"></i> Loading pipelines...
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column: Performance Visualizers -->
+    <div class="ml-right-column">
+        <!-- Comparative Charts -->
+        <div class="dashboard-panel stats-comparison-panel">
+            <div class="panel-header">
+                <h3><i class="fa-solid fa-chart-simple text-neon-purple"></i> Accuracy Performance Comparisons</h3>
+            </div>
+            <div class="ml-chart-container">
+                <canvas id="modelAccuracyChart"></canvas>
+            </div>
+        </div>
+
+        <div class="dashboard-panel stats-comparison-panel">
+            <div class="panel-header">
+                <h3><i class="fa-solid fa-stopwatch text-neon-yellow"></i> Computation Training Duration (Speed)</h3>
+            </div>
+            <div class="ml-chart-container">
+                <canvas id="modelSpeedChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/ml_studio.js') }}"></script>
+{% endblock %}

@@ -6,14 +6,41 @@ import random
 from datetime import datetime, timedelta
 from flask import Flask, render_template, jsonify, request
 import pymysql
+from sqlalchemy import inspect, text
 
-from config import Config
-from models.database import db, ServerMetrics, FailureAlert, ModelPerformance
-from models.ml_pipeline import MLPipeline
+from backend.config import Config
+from database.models import db, ServerMetrics, FailureAlert, ModelPerformance
+from backend.ml_pipeline import MLPipeline
 
-app = Flask(__name__)
+# Project root directory (one level up from backend/)
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+
+app = Flask(
+    __name__,
+    template_folder=os.path.join(PROJECT_ROOT, 'frontend', 'templates'),
+    static_folder=os.path.join(PROJECT_ROOT, 'frontend', 'static')
+)
 app.config.from_object(Config)
 db.init_app(app)
+
+
+def ensure_database_schema():
+    """Ensure the existing SQLite schema includes the virus alert fields used by the dashboard."""
+    with app.app_context():
+        db.create_all()
+        inspector = inspect(db.engine)
+        if 'server_metrics' not in inspector.get_table_names():
+            return
+
+        columns = {column['name'] for column in inspector.get_columns('server_metrics')}
+        if 'virus_active' not in columns:
+            db.session.execute(text('ALTER TABLE server_metrics ADD COLUMN virus_active BOOLEAN DEFAULT 0 NOT NULL'))
+        if 'system_mode' not in columns:
+            db.session.execute(text("ALTER TABLE server_metrics ADD COLUMN system_mode VARCHAR(50) DEFAULT 'Normal' NOT NULL"))
+        db.session.commit()
+
+
+ensure_database_schema()
 
 # Global ML Pipeline instance
 pipeline = MLPipeline()
@@ -221,25 +248,86 @@ def db_config_page():
 
 @app.route('/api/metrics/live', methods=['GET'])
 def get_live_metrics():
-    """
-    Returns the latest 40 metrics records to populate the initial rolling charts,
-    plus the latest state configurations.
-    """
+    """Fetch the latest server metrics and modify them if a virus is active."""
+    latest_metric = ServerMetrics.query.order_by(ServerMetrics.timestamp.desc()).first()
+    if not latest_metric:
+        return jsonify({"success": False, "message": "No metrics available."}), 404
+
+    # Modify metrics if virus is active
+    if latest_metric.virus_active:
+        latest_metric.cpu_usage = 95.0  # Force CPU spike
+        latest_metric.temperature = 90.0  # Critical temperature
+        latest_metric.system_mode = 'CRITICAL ALERT'
+
+    return jsonify({
+        "success": True,
+        "metric": {
+            "cpu_usage": latest_metric.cpu_usage,
+            "memory_usage": latest_metric.memory_usage,
+            "temperature": latest_metric.temperature,
+            "disk_health": latest_metric.disk_health,
+            "network_traffic": latest_metric.network_traffic,
+            "failure_probability": latest_metric.failure_probability,
+            "system_mode": latest_metric.system_mode,
+            "virus_active": latest_metric.virus_active
+        }
+    })
+
+
+@app.route('/api/trigger-virus', methods=['POST'])
+def trigger_virus():
+    """Toggle the virus alert state to simulate malicious activity."""
     try:
-        records = ServerMetrics.query.order_by(ServerMetrics.timestamp.desc()).limit(40).all()
-        # Reverse to get chronological order (oldest to newest)
-        records_list = [r.to_dict() for r in reversed(records)]
-        
-        # Get active model stats
-        active_model = get_active_model_name()
-        
-        return jsonify({
-            'success': True,
-            'metrics': records_list,
-            'active_model': active_model,
-            'current_mode': SIMULATION_STATE['mode']
-        })
+        latest_metric = ServerMetrics.query.order_by(ServerMetrics.timestamp.desc()).first()
+        if not latest_metric:
+            return jsonify({'success': False, 'message': 'No metrics found.'}), 404
+
+        latest_metric.virus_active = True
+        latest_metric.system_mode = 'CRITICAL ALERT'
+        latest_metric.cpu_usage = 95.0
+        latest_metric.temperature = 90.0
+        db.session.commit()
+
+        SIMULATION_STATE['mode'] = 'CRITICAL ALERT'
+        SIMULATION_STATE['last_metric'] = latest_metric.to_dict()
+
+        return jsonify({'success': True, 'message': 'Virus activated.', 'system_mode': latest_metric.system_mode})
     except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/activate-antigravity', methods=['POST'])
+def activate_antigravity():
+    """Lift the virus into an isolated sandbox and restore normal telemetry state."""
+    try:
+        latest_metric = ServerMetrics.query.order_by(ServerMetrics.timestamp.desc()).first()
+        if not latest_metric:
+            return jsonify({'success': False, 'message': 'No metrics found.'}), 404
+
+        latest_metric.virus_active = False
+        latest_metric.system_mode = 'Normal'
+        latest_metric.cpu_usage = 33.4
+        latest_metric.temperature = 44.1
+        latest_metric.failure_probability = 0.0
+        db.session.commit()
+
+        SIMULATION_STATE['mode'] = 'Normal'
+        SIMULATION_STATE['last_metric'] = latest_metric.to_dict()
+
+        alert = FailureAlert(
+            timestamp=datetime.utcnow(),
+            failure_type='Virus Remediation',
+            probability=0.0,
+            severity='Info',
+            message='Virus lifted into isolated Zero-G sandbox and purged.'
+        )
+        db.session.add(alert)
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Virus lifted into isolated Zero-G sandbox and purged.', 'system_mode': latest_metric.system_mode})
+    except Exception as e:
+        db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -460,8 +548,7 @@ def resolve_alert():
 
 def _read_env_vars():
     """Read current MySQL env vars from .env file."""
-    env_path = os.path.join(app.config.get('SAVED_MODELS_DIR', '').replace('saved_models', ''), '.env')
-    env_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), '.env')
+    env_path = os.path.join(PROJECT_ROOT, '.env')
     vals = {'MYSQL_USER': '', 'MYSQL_PASSWORD': '', 'MYSQL_HOST': 'localhost',
             'MYSQL_PORT': '3306', 'MYSQL_DB': ''}
     if os.path.exists(env_path):
@@ -477,7 +564,7 @@ def _read_env_vars():
 
 def _write_env_file(user='', password='', host='localhost', port='3306', db_name=''):
     """Write MySQL credentials (or clear them) to the .env file."""
-    env_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), '.env')
+    env_path = os.path.join(PROJECT_ROOT, '.env')
     secret = os.environ.get('SECRET_KEY', 'predictive-server-failure-detect-key-9821')
     lines = [
         '# =========================================================================\n',
@@ -579,11 +666,10 @@ def db_connect():
 
     if use_sqlite:
         _write_env_file()  # Clear MySQL vars
-        base = os.path.abspath(os.path.dirname(__file__))
-        new_uri = 'sqlite:///' + os.path.join(base, 'project.db')
+        new_uri = 'sqlite:///' + os.path.join(PROJECT_ROOT, 'database', 'project.db')
         app.config['SQLALCHEMY_DATABASE_URI'] = new_uri
         return jsonify({'success': True,
-                        'message': 'Reverted to local SQLite database. Restart app.py to fully apply.'})
+                        'message': 'Reverted to local SQLite database. Restart run.py to fully apply.'})
 
     host     = data.get('host', 'localhost')
     port     = str(data.get('port', '3306'))
@@ -624,7 +710,7 @@ def db_connect():
 
     return jsonify({
         'success': True,
-        'message': f'Connected to MySQL database "{db_name}" on {host}:{port}. Tables created. Restart app.py to fully activate the background simulator on the new database.'
+        'message': f'Connected to MySQL database "{db_name}" on {host}:{port}. Tables created. Restart run.py to fully activate the background simulator on the new database.'
     })
 
 
@@ -635,15 +721,15 @@ def db_seed():
         # Import and run the seeder within this app context
         import importlib, sys
         # Remove cached module so it re-runs cleanly
-        if 'generate_data' in sys.modules:
-            del sys.modules['generate_data']
+        if 'database.generate_data' in sys.modules:
+            del sys.modules['database.generate_data']
 
         # We'll manually call the pipeline + DB seed steps here
         print('Re-seeding database from API request...')
         db.drop_all()
         db.create_all()
 
-        from models.ml_pipeline import MLPipeline as _PL
+        from backend.ml_pipeline import MLPipeline as _PL
         pl = _PL()
         df = pl.generate_synthetic_data(num_samples=2000, random_seed=42)
         stats = pl.train_models(df)

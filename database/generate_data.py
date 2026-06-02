@@ -3,13 +3,14 @@ import sys
 from datetime import datetime, timedelta
 import random
 
-# Add project path to python path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# Project root is one level up from this file's directory
+PROJECT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, PROJECT_DIR)
 
 from flask import Flask
-from config import Config
-from models.database import db, ServerMetrics, ModelPerformance, FailureAlert
-from models.ml_pipeline import MLPipeline
+from backend.config import Config
+from database.models import db, ServerMetrics, ModelPerformance, FailureAlert
+from backend.ml_pipeline import MLPipeline
 
 def setup_initial_database():
     print("Setting up database and generating initial ML models...")
@@ -65,6 +66,8 @@ def setup_initial_database():
             temp = random.uniform(38, 52)
             disk = random.uniform(92, 98)
             net = random.uniform(5, 40)
+            virus_active = False
+            system_mode = 'Normal'
             
             # Let's inject a brief simulated overheat anomaly in the past (around index 70-75)
             true_label = 0
@@ -74,6 +77,8 @@ def setup_initial_database():
                 temp = random.uniform(85, 90)
                 true_label = 1
                 fail_type = 'CPU Overheat'
+                virus_active = True
+                system_mode = 'CRITICAL ALERT'
                 
             pred_fail, fail_prob = pipeline.predict('Random Forest', cpu, mem, temp, disk, net)
             
@@ -88,7 +93,9 @@ def setup_initial_database():
                 failure_probability=fail_prob,
                 active_model='Random Forest',
                 true_label=true_label,
-                failure_type=fail_type
+                failure_type=fail_type,
+                virus_active=virus_active,
+                system_mode=system_mode
             )
             db.session.add(metric)
             
@@ -99,15 +106,12 @@ def setup_initial_database():
                     failure_type='CPU Overheat',
                     probability=fail_prob,
                     severity='Critical',
-                    message=f"CRITICAL ALERT: CPU temperature spiked to {temp:.1f}°C (CPU usage: {cpu:.1f}%). High risk of core damage or crash.",
-                    resolved=True,
-                    resolved_at=time_offset + timedelta(minutes=15),
-                    resolution_notes="Automatic thermal mitigation triggered. CPU load cooled down."
+                    message='Simulated overheat anomaly detected during initial seeding.'
                 )
                 db.session.add(alert)
-                
+
         db.session.commit()
-        print("Database seeded with historical metrics and historical resolved alerts successfully!")
+        print("Database seeding completed successfully!")
 
 if __name__ == '__main__':
     setup_initial_database()

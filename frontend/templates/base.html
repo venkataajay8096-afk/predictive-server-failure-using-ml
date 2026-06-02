@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Server Failure Monitor</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Custom Style -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/2885/2885417.png">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brand-icon">
+                    <i class="fa-solid fa-server pulse-neon"></i>
+                </div>
+                <div class="brand-text">
+                    <h1>Server<span> Monitor</span></h1>
+                    <span class="subtext">Live Diagnostics</span>
+                </div>
+            </div>
+            
+            <nav class="nav-menu">
+                <a href="/" class="nav-item {% if active_page == 'dashboard' %}active{% endif %}" id="nav-dashboard">
+                    <i class="fa-solid fa-satellite-dish"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/ml-studio" class="nav-item {% if active_page == 'ml_studio' %}active{% endif %}" id="nav-ml-studio">
+                    <i class="fa-solid fa-atom"></i>
+                    <span>ML Models</span>
+                </a>
+                <a href="/alerts" class="nav-item {% if active_page == 'alerts' %}active{% endif %}" id="nav-alerts">
+                    <i class="fa-solid fa-shield-halved"></i>
+                    <span>Active Alerts</span>
+                    <span class="alert-count-badge" id="active-alert-badge" style="display: none;">0</span>
+                </a>
+                <a href="/db-config" class="nav-item {% if active_page == 'db_config' %}active{% endif %}" id="nav-db-config">
+                    <i class="fa-solid fa-microchip"></i>
+                    <span>System Metrics</span>
+                </a>
+            </nav>
+            
+            <div class="system-status-widget">
+                <div class="status-header">
+                    <span>System Status</span>
+                    <span class="status-dot status-online" id="global-status-dot"></span>
+                </div>
+                <div class="status-detail">
+                    <p>Model: <strong id="widget-active-model">Random Forest</strong></p>
+                    <p>Mode: <strong id="widget-current-mode" class="text-neon-cyan">Normal</strong></p>
+                </div>
+            </div>
+            
+            <div class="sidebar-footer">
+                <p>&copy; 2026 Server Monitor</p>
+                <p class="footer-version">v2.1.0 • Predictive AI</p>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header class="top-header">
+                <div class="header-title">
+                    <h2 id="page-title">
+                        {% if active_page == 'dashboard' %}Live Health Dashboard
+                        {% elif active_page == 'ml_studio' %}Machine Learning Studio
+                        {% elif active_page == 'alerts' %}Alert &amp; Incident Log Center
+                        {% elif active_page == 'db_config' %}Database Connection Manager
+                        {% endif %}
+                    </h2>
+                    <p id="page-subtitle">
+                        {% if active_page == 'dashboard' %}Real-time server telemetry and diagnostics.
+                        {% elif active_page == 'ml_studio' %}Evaluate, retrain, and swap machine learning models dynamically.
+                        {% elif active_page == 'alerts' %}Manage active warnings, examine historical incidents, and log resolutions.
+                        {% elif active_page == 'db_config' %}Configure MySQL or SQLite database, test connectivity, and manage data seeding.
+                        {% endif %}
+                    </p>
+                </div>
+                
+                <div class="header-actions">
+                    <div class="time-widget">
+                        <i class="fa-regular fa-clock"></i>
+                        <span id="current-time">08:00:00 AM</span>
+                    </div>
+                    <button class="theme-toggle-btn" id="theme-toggle-btn" type="button" aria-label="Toggle theme">
+                        <i class="fa-solid fa-moon"></i>
+                        <span>Dark / Light</span>
+                    </button>
+                    <div class="connection-pill">
+                        <span class="pill-dot pulse"></span>
+                        <span class="pill-text">Live Telemetry</span>
+                    </div>
+                </div>
+            </header>
+            
+            <div class="content-body">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+
+    <!-- Active Incident Alarm Bar (Pulsing Red overlay with Audible Ringing if failure risk is extremely high) -->
+    <div class="global-alarm-banner" id="global-alarm-banner" style="display: none;">
+        <div class="alarm-content">
+            <i class="fa-solid fa-triangle-exclamation pulse"></i>
+            <span><strong>CRITICAL:</strong> Impending server crash predicted! Failure risk exceeds <span id="alarm-probability">0%</span>. Take mitigation actions!</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <button class="alarm-mute-btn" id="alarm-mute-btn" onclick="toggleMute()" title="Mute/Unmute Alarm Sound" style="background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2); color: #fff; cursor: pointer; font-size: 14px; display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 8px; transition: all 0.3s ease;">
+                <i class="fa-solid fa-volume-high"></i>
+            </button>
+            <button class="alarm-close-btn" onclick="dismissAlarm()"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+    </div>
+
+    <!-- Global Javascript -->
+    <script>
+        const themeToggleBtn = document.getElementById('theme-toggle-btn');
+        const savedTheme = localStorage.getItem('anti-gravity-theme');
+        if (savedTheme === 'light') {
+            document.body.classList.add('light-mode');
+        }
+        if (themeToggleBtn) {
+            themeToggleBtn.addEventListener('click', () => {
+                document.body.classList.toggle('light-mode');
+                const isLight = document.body.classList.contains('light-mode');
+                localStorage.setItem('anti-gravity-theme', isLight ? 'light' : 'dark');
+                const icon = themeToggleBtn.querySelector('i');
+                if (icon) icon.className = isLight ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+            });
+        }
+
+        // Audio synthesis for live ringing alarm
+        let audioCtx = null;
+        let alarmInterval = null;
+        let isMuted = false;
+
+        function playAlarmBeeps() {
+            if (isMuted) return;
+            try {
+                // Initialize Web Audio context lazily on first user interaction or trigger
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                
+                // Resume context if suspended by browser security policy
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                
+                const now = audioCtx.currentTime;
+                
+                // Sound synthesis - classic dual-tone digital alarm alert (Beep 1)
+                const osc1 = audioCtx.createOscillator();
+                const gain1 = audioCtx.createGain();
+                osc1.type = 'sawtooth';
+                osc1.frequency.setValueAtTime(980, now);
+                osc1.frequency.exponentialRampToValueAtTime(580, now + 0.12);
+                gain1.gain.setValueAtTime(0.06, now);
+                gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+                osc1.connect(gain1);
+                gain1.connect(audioCtx.destination);
+                osc1.start(now);
+                osc1.stop(now + 0.12);
+                
+                // Beep 2 (played slightly delayed for warbling sonar alarm effect)
+                setTimeout(() => {
+                    if (isMuted || !alarmInterval) return;
+                    const now2 = audioCtx.currentTime;
+                    const osc2 = audioCtx.createOscillator();
+                    const gain2 = audioCtx.createGain();
+                    osc2.type = 'sawtooth';
+                    osc2.frequency.setValueAtTime(980, now2);
+                    osc2.frequency.exponentialRampToValueAtTime(580, now2 + 0.12);
+                    gain2.gain.setValueAtTime(0.06, now2);
+                    gain2.gain.exponentialRampToValueAtTime(0.001, now2 + 0.12);
+                    osc2.connect(gain2);
+                    gain2.connect(audioCtx.destination);
+                    osc2.start(now2);
+                    osc2.stop(now2 + 0.12);
+                }, 180);
+                
+            } catch (e) {
+                console.warn("Audible alarm synthesis not supported or blocked by security policies:", e);
+            }
+        }
+
+        function startAlarmRinging() {
+            if (alarmInterval || isMuted) return;
+            // Play initial trigger sound and schedule repeated playbacks every 1.5s
+            playAlarmBeeps();
+            alarmInterval = setInterval(playAlarmBeeps, 1500);
+            console.log("Audio warning ringing initiated.");
+        }
+
+        function stopAlarmRinging() {
+            if (alarmInterval) {
+                clearInterval(alarmInterval);
+                alarmInterval = null;
+                console.log("Audio warning ringing terminated.");
+            }
+        }
+
+        function toggleMute() {
+            isMuted = !isMuted;
+            const icon = document.querySelector('#alarm-mute-btn i');
+            const button = document.getElementById('alarm-mute-btn');
+            
+            if (isMuted) {
+                icon.className = 'fa-solid fa-volume-xmark';
+                button.style.background = 'rgba(255,26,102,0.2)';
+                button.style.borderColor = 'rgba(255,26,102,0.45)';
+                button.style.color = '#ff1a66';
+                stopAlarmRinging();
+            } else {
+                icon.className = 'fa-solid fa-volume-high';
+                button.style.background = 'rgba(255,255,255,0.15)';
+                button.style.borderColor = 'rgba(255,255,255,0.2)';
+                button.style.color = '#fff';
+                // Trigger context resume to ensure audio works on user unmute
+                if (audioCtx) audioCtx.resume();
+                
+                // If there's an active critical alarm, start ringing immediately
+                const banner = document.getElementById('global-alarm-banner');
+                if (banner.style.display !== 'none') {
+                    startAlarmRinging();
+                }
+            }
+        }
+
+        // Update Time Widget
+        function updateTime() {
+            const now = new Date();
+            let hours = now.getHours();
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? hours : 12; // 0 should be 12
+            document.getElementById('current-time').textContent = `${String(hours).padStart(2, '0')}:${minutes}:${seconds} ${ampm}`;
+        }
+        setInterval(updateTime, 1000);
+        updateTime();
+
+        // Check for active alerts periodically to update the badge, top banner, and audible alarm status
+        function checkGlobalAlerts() {
+            fetch('/api/alerts/active')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        const badge = document.getElementById('active-alert-badge');
+                        const count = data.alerts.length;
+                        
+                        if (count > 0) {
+                            badge.textContent = count;
+                            badge.style.display = 'flex';
+                            
+                            // Get worst alert details
+                            const worstAlert = data.alerts[0];
+                            if (worstAlert.severity === 'Critical') {
+                                document.getElementById('alarm-probability').textContent = (worstAlert.probability * 100).toFixed(0) + '%';
+                                document.getElementById('global-alarm-banner').style.display = 'flex';
+                                document.getElementById('global-status-dot').className = 'status-dot status-danger';
+                                
+                                // Audible alert - Start electronic alarm loop
+                                startAlarmRinging();
+                            } else {
+                                document.getElementById('global-status-dot').className = 'status-dot status-warning';
+                                stopAlarmRinging();
+                            }
+                        } else {
+                            badge.style.display = 'none';
+                            document.getElementById('global-alarm-banner').style.display = 'none';
+                            document.getElementById('global-status-dot').className = 'status-dot status-online';
+                            stopAlarmRinging();
+                        }
+                    }
+                })
+                .catch(err => console.error("Error checking alerts:", err));
+        }
+
+        // Run check alerts on load and every 5 seconds
+        setInterval(checkGlobalAlerts, 5000);
+        window.addEventListener('load', checkGlobalAlerts);
+
+        function dismissAlarm() {
+            document.getElementById('global-alarm-banner').style.opacity = '0';
+            stopAlarmRinging(); // Silent it when dismissed
+            setTimeout(() => {
+                document.getElementById('global-alarm-banner').style.display = 'none';
+                document.getElementById('global-alarm-banner').style.opacity = '1';
+            }, 300);
+        }
+    </script>
+    
+    {% block scripts %}{% endblock %}
+</body>
+</html>
